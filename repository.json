@@ -1,0 +1,17 @@
+{
+  "name": "SMA SI 6048 - EVTV BMS Bridge",
+  "url": "https://github.com/mobiletru/sma-si-can",
+  "documentation": "https://github.com/mobiletru/sma-si-can/blob/main/README.md",
+  "issues": "https://github.com/mobiletru/sma-si-can/issues",
+  "addons": [
+    {
+      "slug": "sma-si-6048-bridge",
+      "name": "SMA SI 6048 - EVTV Bridge",
+      "description": "Read EVTV BMS from PCAN, publish to HA, send SI control frames to 6048",
+      "homeassistant": "2023.10.0",
+      "repository": "https://github.com/mobiletru/sma-si-can",
+      "issues": "https://github.com/mobiletru/sma-si-can/issues",
+      "documentation": "https://github.com/mobiletru/sma-si-can/blob/main/DIRECT_BRIDGE.md"
+    }
+  ]
+}

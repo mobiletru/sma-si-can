@@ -1,0 +1,27 @@
+{
+  "name": "SMA SI 6048 - EVTV Bridge",
+  "version": "1.0.0",
+  "slug": "sma-si-6048-bridge",
+  "description": "Read EVTV BMS from PCAN, publish to Home Assistant, send SI control frames to 6048",
+  "url": "https://github.com/mobiletru/sma-si-can",
+  "arch": ["armhf", "armv7", "aarch64", "amd64"],
+  "startup": "services",
+  "boot": "auto",
+  "privileged": ["NET_ADMIN", "SYS_RAWIO"],
+  "options": {
+    "can_channel": "PCAN_USBCH1",
+    "ha_host": "localhost",
+    "ha_port": 8123,
+    "log_level": "info"
+  },
+  "schema": {
+    "can_channel": "str",
+    "ha_host": "str",
+    "ha_port": "int(1,65535)",
+    "log_level": "select(debug|info|warning|error)"
+  },
+  "homeassistant_api": true,
+  "environment": {
+    "PYTHONUNBUFFERED": "1"
+  }
+}
