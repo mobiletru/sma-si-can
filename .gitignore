@@ -1,0 +1,24 @@
+# Nested repos — clone with clone-repos.ps1 (see README)
+haos-addon-modbus/
+hacs-sma-sunny-island/
+cloud-monitor/
+
+# Build artifacts
+addon/
+dist/
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE / debug
+.cursor/
+debug-*.log
+grok-settings-export/
+
+# Node (if any local tooling)
+node_modules/
+.wrangler/

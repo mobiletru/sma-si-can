@@ -1,0 +1,28 @@
+{
+  "name": "SMA SI CAN - EVTV Converter",
+  "version": "1.0.0",
+  "slug": "sma-si-evtv-converter",
+  "description": "Convert EVTV BMS frames to SMA Sunny Island CAN protocol, publish to Home Assistant",
+  "url": "https://github.com/mobiletru/sma-si-can",
+  "arch": ["armhf", "armv7", "aarch64", "amd64"],
+  "startup": "services",
+  "boot": "auto",
+  "options": {
+    "relay_host": "nas.local",
+    "relay_port": 9001,
+    "ha_host": "localhost",
+    "ha_port": 8123,
+    "log_level": "info"
+  },
+  "schema": {
+    "relay_host": "str",
+    "relay_port": "int(1,65535)",
+    "ha_host": "str",
+    "ha_port": "int(1,65535)",
+    "log_level": "select(debug|info|warning|error)"
+  },
+  "homeassistant_api": true,
+  "environment": {
+    "PYTHONUNBUFFERED": "1"
+  }
+}

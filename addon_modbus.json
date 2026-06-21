@@ -1,0 +1,43 @@
+{
+  "name": "SMA SI CAN - Modbus Bridge",
+  "version": "1.0.0",
+  "slug": "sma-si-modbus-bridge",
+  "description": "Poll a Modbus BMS, encode SMA Sunny Island CAN frames, and send them via PCAN or SocketCAN",
+  "url": "https://github.com/mobiletru/sma-si-can",
+  "arch": ["armhf", "armv7", "aarch64", "amd64"],
+  "startup": "services",
+  "boot": "auto",
+  "privileged": ["NET_ADMIN", "SYS_RAWIO"],
+  "options": {
+    "modbus_mode": "tcp",
+    "modbus_host": "127.0.0.1",
+    "modbus_port": 502,
+    "modbus_unit": 1,
+    "modbus_serial": "/dev/ttyUSB0",
+    "modbus_baud": 9600,
+    "register_map_path": "/config/modbus_register_map.json",
+    "can_interface": "pcan",
+    "can_channel": "PCAN_USBCH1",
+    "poll_interval": "0.5",
+    "send_interval": "0.05",
+    "log_level": "info"
+  },
+  "schema": {
+    "modbus_mode": "select(tcp|rtu)",
+    "modbus_host": "str",
+    "modbus_port": "int(1,65535)",
+    "modbus_unit": "int(1,247)",
+    "modbus_serial": "str",
+    "modbus_baud": "int(1,921600)",
+    "register_map_path": "str",
+    "can_interface": "select(pcan|socketcan)",
+    "can_channel": "str",
+    "poll_interval": "str",
+    "send_interval": "str",
+    "log_level": "select(debug|info|warning|error)"
+  },
+  "homeassistant_api": true,
+  "environment": {
+    "PYTHONUNBUFFERED": "1"
+  }
+}

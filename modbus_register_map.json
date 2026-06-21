@@ -1,0 +1,49 @@
+{
+  "description": "Example Modbus register map — adjust addresses to match your BMS manual",
+  "registers": {
+    "pack_voltage_v": {
+      "address": 0,
+      "type": "holding",
+      "dtype": "uint16",
+      "scale": 0.1
+    },
+    "pack_current_a": {
+      "address": 1,
+      "type": "holding",
+      "dtype": "int16",
+      "scale": 0.1
+    },
+    "soc_pct": {
+      "address": 2,
+      "type": "holding",
+      "dtype": "uint16",
+      "scale": 1.0
+    },
+    "soh_pct": {
+      "address": 3,
+      "type": "holding",
+      "dtype": "uint16",
+      "scale": 1.0
+    },
+    "error_flags": {
+      "address": 4,
+      "type": "holding",
+      "dtype": "uint16",
+      "scale": 1.0
+    },
+    "temps": {
+      "address": 10,
+      "type": "holding",
+      "dtype": "int16",
+      "scale": 0.1,
+      "count": 4
+    },
+    "cell_voltages": {
+      "address": 20,
+      "type": "holding",
+      "dtype": "uint16",
+      "scale": 0.001,
+      "count": 8
+    }
+  }
+}

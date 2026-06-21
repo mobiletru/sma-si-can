@@ -1,0 +1,145 @@
+{
+  "description": "SMA Sunny Island / SBU Modbus registers (WebBox profile, unit ID 3-247)",
+  "registers": {
+    "condition": {
+      "address": 30201,
+      "dtype": "U32",
+      "format": "ENUM",
+      "access": "RO",
+      "description": "Condition / operating mode"
+    },
+    "battery_current_a": {
+      "address": 30843,
+      "dtype": "S32",
+      "format": "FIX3",
+      "access": "RO",
+      "description": "Battery current (A)"
+    },
+    "battery_soc_pct": {
+      "address": 30845,
+      "dtype": "U32",
+      "format": "FIX0",
+      "access": "RO",
+      "description": "Battery state of charge (%)"
+    },
+    "battery_soh_pct": {
+      "address": 30847,
+      "dtype": "U32",
+      "format": "FIX0",
+      "access": "RO",
+      "description": "Battery state of health (%)"
+    },
+    "battery_temp_c": {
+      "address": 30849,
+      "dtype": "S32",
+      "format": "TEMP",
+      "access": "RO",
+      "description": "Battery temperature (C)"
+    },
+    "battery_voltage_v": {
+      "address": 30851,
+      "dtype": "U32",
+      "format": "FIX2",
+      "access": "RO",
+      "description": "Battery voltage (V)"
+    },
+    "battery_charge_mode": {
+      "address": 30853,
+      "dtype": "U32",
+      "format": "ENUM",
+      "access": "RO",
+      "description": "Active battery charging mode"
+    },
+    "grid_import_power_w": {
+      "address": 30865,
+      "dtype": "S32",
+      "format": "FIX0",
+      "access": "RO",
+      "description": "Power grid reference / import (W)"
+    },
+    "grid_export_power_w": {
+      "address": 30867,
+      "dtype": "S32",
+      "format": "FIX0",
+      "access": "RO",
+      "description": "Power grid feed-in / export (W)"
+    },
+    "pv_power_w": {
+      "address": 30869,
+      "dtype": "S32",
+      "format": "FIX0",
+      "access": "RO",
+      "description": "PV power generated (W)"
+    },
+    "operating_condition": {
+      "address": 40009,
+      "dtype": "U32",
+      "format": "ENUM",
+      "access": "RW",
+      "description": "Operating condition: 381=Stop, 569=Activated"
+    },
+    "battery_type": {
+      "address": 40035,
+      "dtype": "U32",
+      "format": "ENUM",
+      "access": "RO",
+      "description": "Battery type enum"
+    },
+    "grid_frequency_min_hz": {
+      "address": 40101,
+      "dtype": "U32",
+      "format": "FIX2",
+      "access": "RW",
+      "description": "Frequency monitoring minimum threshold (Hz)"
+    },
+    "grid_frequency_max_hz": {
+      "address": 40103,
+      "dtype": "U32",
+      "format": "FIX2",
+      "access": "RW",
+      "description": "Frequency monitoring maximum threshold (Hz)"
+    },
+    "country_standard": {
+      "address": 40109,
+      "dtype": "U32",
+      "format": "ENUM",
+      "access": "RW",
+      "description": "Country / grid standard code"
+    },
+    "grid_rated_current_a": {
+      "address": 40131,
+      "dtype": "U32",
+      "format": "FIX2",
+      "access": "RW",
+      "description": "Grid connection point rated current (A)"
+    },
+    "grid_nominal_voltage_v": {
+      "address": 40133,
+      "dtype": "U32",
+      "format": "FIX0",
+      "access": "RW",
+      "description": "Grid nominal voltage (V)"
+    },
+    "grid_nominal_frequency_hz": {
+      "address": 40135,
+      "dtype": "U32",
+      "format": "FIX2",
+      "access": "RW",
+      "description": "Nominal frequency (Hz)"
+    },
+    "max_charge_current_a": {
+      "address": 40045,
+      "dtype": "U32",
+      "format": "FIX3",
+      "access": "RW",
+      "description": "Max battery charging current (A)"
+    },
+    "max_discharge_current_a": {
+      "address": 40083,
+      "dtype": "U32",
+      "format": "FIX3",
+      "access": "RW",
+      "description": "Maximum discharging current battery (A)"
+    }
+  }
+}
