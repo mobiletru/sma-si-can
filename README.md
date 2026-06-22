@@ -82,16 +82,15 @@ Bidirectional CAN bridge for Home Assistant: read EVTV BMS frames, publish to HA
 
 ### Frame ID Mapping
 
-If your EVTV uses different CAN IDs, edit `bridge_direct.py`:
+The bridge decodes the EVTV ESP32 BMS broadcast IDs (defined in
+`bridge_direct.py`):
 
 ```python
 class EVTVReader:
-    EVTV_VOLTAGE = 0x100    # ← Change these to match your setup
-    EVTV_CURRENT = 0x101
-    EVTV_STATE = 0x102
-    EVTV_CELLS_1 = 0x103
-    EVTV_CELLS_2 = 0x104
-    EVTV_TEMPS = 0x105
+    EVTV_STATUS = 0x150        # current (signed), voltage (x10), Ah (signed x10), max/min temp
+    EVTV_SOC = 0x650           # SOC * 2
+    EVTV_CELL_SUMMARY = 0x651  # low/high/avg cell voltage (x1000)
+    EVTV_CELLS = 0x68F         # sequenced individual cell voltages
 ```
 
 Identify actual IDs with a CAN analyzer:
@@ -132,12 +131,14 @@ Automatically created:
 | Sensor | Unit | Description |
 |--------|------|-------------|
 | `pack_voltage_v` | V | Pack voltage |
-| `pack_current_a` | A | Pack current (discharge +, charge -) |
-| `soc_pct` | % | State of Charge |
-| `soh_pct` | % | State of Health |
-| `temperature_c` | °C | BMS temperature |
+| `pack_current_a` | A | Pack current (signed; charge +, discharge − per EVTV) |
+| `pack_ah` | Ah | Pack amp-hours used (signed; usually negative) |
+| `soc_pct` | % | State of Charge (½% resolution) |
+| `soh_pct` | % | State of Health (not reported by EVTV; defaults to 100) |
+| `temperature_c` / `temp_max_c` | °C | Max battery terminal temperature |
+| `temp_min_c` | °C | Min battery terminal temperature |
+| `cell_high_v` / `cell_low_v` / `cell_avg_v` | V | High / low / average cell voltage |
 | `cell_1_v` ... `cell_4_v` | V | Individual cell voltages |
-| `temp_1_c` ... `temp_4_c` | °C | Temperature sensor readings |
 
 All sensors update in real-time (~50ms latency).
 
@@ -284,13 +285,15 @@ Reads EVTV, encodes SI frames, sends back on same bus.
 
 ## Protocol Details
 
-### EVTV Frame Format (11-bit CAN IDs)
+### EVTV ESP32 BMS Frame Format (11-bit CAN IDs, LSB:MSB)
 ```
-0x100: Pack voltage          (2 bytes, 0.01V/LSB)
-0x101: Pack current          (2 bytes, 0.1A/LSB, offset -3200A)
-0x102: SOC/SOH               (2 bytes, 1%/LSB)
-0x103-0x104: Cell voltages   (2 bytes each, 0.001V/LSB)
-0x105: Temperatures          (4 bytes, 0.1°C/LSB, -40°C offset)
+0x150: byte0/1 Pack current   (16-bit SIGNED, A; >0 charge, <0 discharge)
+       byte2/3 Pack voltage   (16-bit unsigned, x10  -> /10 for volts)
+       byte4/5 Pack amp-hours (16-bit SIGNED, x10; usually negative)
+       byte6   Max temp (°C, whole)   byte7 Min temp (°C, whole)
+0x650: byte0   SOC            (8-bit, x2 -> /2 for percent)
+0x651: byte0/1 Low cell V, byte2/3 High cell V, byte4/5 Avg cell V (x1000)
+0x68F: byte0 sequence, byte1 total msgs, byte2-7 six cells as (V-2.00)*100
 ```
 
 ### SMA SI Output (converted from EVTV)
