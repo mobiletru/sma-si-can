@@ -18,7 +18,12 @@ import requests
 
 # Try importing CAN libraries
 try:
-    from can_interface import CANBusInterface, create_pcan_interface
+    from can_interface import (
+        CANBusInterface,
+        create_pcan_interface,
+        create_socketcan_interface,
+        create_virtual_interface,
+    )
     from protocol import FrameID, decode_frame
 except ImportError as e:
     logging.error(f"Failed to import can_interface: {e}")
@@ -320,7 +325,11 @@ def main():
     import os
     
     parser = argparse.ArgumentParser('EVTV→SI 6048 Bridge (HAOS)')
-    parser.add_argument('--can-channel', default=os.getenv('CAN_CHANNEL', 'PCAN_USBCH1'))
+    parser.add_argument('--can-interface',
+                        default=os.getenv('CAN_INTERFACE', 'socketcan'),
+                        choices=['socketcan', 'pcan', 'virtual'],
+                        help='CAN backend. On HAOS PCAN-USB appears as SocketCAN (can0).')
+    parser.add_argument('--can-channel', default=os.getenv('CAN_CHANNEL', 'can0'))
     parser.add_argument('--ha-host', default=os.getenv('HA_HOST', 'localhost'))
     parser.add_argument('--ha-port', type=int, default=int(os.getenv('HA_PORT', '8123')))
     parser.add_argument('--log-level', default=os.getenv('LOG_LEVEL', 'INFO').upper())
@@ -328,14 +337,19 @@ def main():
     args = parser.parse_args()
     logging.getLogger().setLevel(getattr(logging, args.log_level))
     
-    logger.info(f"Connecting to PCAN: {args.can_channel}")
-    can = create_pcan_interface(channel=args.can_channel)
+    logger.info(f"Connecting to CAN: {args.can_interface}:{args.can_channel}")
+    if args.can_interface == 'pcan':
+        can = create_pcan_interface(channel=args.can_channel)
+    elif args.can_interface == 'virtual':
+        can = create_virtual_interface(channel=args.can_channel)
+    else:
+        can = create_socketcan_interface(channel=args.can_channel)
     
     if not can.connect():
-        logger.error("PCAN connect failed")
+        logger.error(f"CAN connect failed ({args.can_interface}:{args.can_channel})")
         return 1
     
-    logger.info("Connected to PCAN")
+    logger.info(f"Connected to CAN ({args.can_interface}:{args.can_channel})")
     
     bridge = EVTVtoSIBridge(
         can,

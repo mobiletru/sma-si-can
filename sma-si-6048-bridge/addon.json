@@ -9,12 +9,14 @@
   "boot": "auto",
   "privileged": ["NET_ADMIN", "SYS_RAWIO"],
   "options": {
-    "can_channel": "PCAN_USBCH1",
+    "can_interface": "socketcan",
+    "can_channel": "can0",
     "ha_host": "localhost",
     "ha_port": 8123,
     "log_level": "info"
   },
   "schema": {
+    "can_interface": "select(socketcan|pcan|virtual)",
     "can_channel": "str",
     "ha_host": "str",
     "ha_port": "int(1,65535)",
