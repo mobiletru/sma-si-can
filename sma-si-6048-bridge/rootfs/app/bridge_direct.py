@@ -37,12 +37,19 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class EVTVState:
-    """Current EVTV BMS state"""
+    """Current EVTV BMS state (decoded from EVTV ESP32 CAN broadcast)"""
     voltage_v: float = 0.0
+    # Pack current is signed. Per the EVTV ESP32 spec (0x150) positive values
+    # are charging and negative values are discharging.
     current_a: float = 0.0
-    soc_pct: int = 0
-    soh_pct: int = 100
-    temp_c: float = 20.0
+    amp_hours: float = 0.0      # amp-hours used from pack (usually negative)
+    soc_pct: float = 0.0
+    soh_pct: int = 100          # not reported by EVTV; kept at default
+    temp_c: float = 20.0        # max cell-terminal temperature
+    temp_min_c: float = 20.0
+    cell_high_v: float = 0.0
+    cell_low_v: float = 0.0
+    cell_avg_v: float = 0.0
     cell_voltages: list = None
     temps: list = None
     
@@ -54,16 +61,18 @@ class EVTVState:
 
 
 class EVTVReader:
-    """Read EVTV BMS frames from PCAN"""
-    
-    # Adjust these to match your EVTV frame IDs
-    EVTV_VOLTAGE = 0x100
-    EVTV_CURRENT = 0x101
-    EVTV_STATE = 0x102
-    EVTV_CELLS_1 = 0x103
-    EVTV_CELLS_2 = 0x104
-    EVTV_TEMPS = 0x105
-    
+    """Read EVTV ESP32 BMS frames from CAN.
+
+    Frame layout follows the EVTV ESP32 BMS Controller spec (CAN 2.0A, 11-bit
+    IDs, little-endian / LSB:MSB). Note the signed fields: pack current and
+    pack amp-hours are 16-bit *signed* integers.
+    """
+
+    EVTV_STATUS = 0x150       # current(signed), voltage(x10), Ah(signed x10), max/min temp
+    EVTV_SOC = 0x650          # SOC * 2 (single byte)
+    EVTV_CELL_SUMMARY = 0x651  # low/high/avg cell voltage (x1000)
+    EVTV_CELLS = 0x68F        # sequenced individual cell voltages
+
     def __init__(self, can_interface: CANBusInterface):
         self.can = can_interface
         self.state = EVTVState()
@@ -81,33 +90,36 @@ class EVTVReader:
         return True
     
     def _parse_frame(self, frame_id: int, data: bytes) -> None:
-        """Parse frame and update state"""
-        if frame_id == self.EVTV_VOLTAGE and len(data) >= 2:
-            self.state.voltage_v = int.from_bytes(data[0:2], 'little') * 0.01
+        """Parse an EVTV ESP32 BMS frame and update state"""
+        if frame_id == self.EVTV_STATUS and len(data) >= 8:
+            # Byte 0/1: pack current, 16-bit SIGNED, amps (>0 charge, <0 discharge)
+            self.state.current_a = float(int.from_bytes(data[0:2], 'little', signed=True))
+            # Byte 2/3: pack voltage, 16-bit unsigned, x10
+            self.state.voltage_v = int.from_bytes(data[2:4], 'little') / 10.0
+            # Byte 4/5: pack amp-hours used, 16-bit SIGNED, x10 (usually negative)
+            self.state.amp_hours = int.from_bytes(data[4:6], 'little', signed=True) / 10.0
+            # Byte 6: max battery temp, Byte 7: min battery temp (whole deg C)
+            self.state.temp_c = float(data[6])
+            self.state.temp_min_c = float(data[7])
+            self.state.temps = [float(data[6]), float(data[7])]
         
-        elif frame_id == self.EVTV_CURRENT and len(data) >= 2:
-            raw = int.from_bytes(data[0:2], 'little', signed=True)
-            self.state.current_a = (raw * 0.1) - 3200
+        elif frame_id == self.EVTV_SOC and len(data) >= 1:
+            # Byte 0: SOC * 2 -> half-percent resolution
+            self.state.soc_pct = data[0] / 2.0
         
-        elif frame_id == self.EVTV_STATE and len(data) >= 2:
-            self.state.soc_pct = data[0]
-            self.state.soh_pct = data[1]
+        elif frame_id == self.EVTV_CELL_SUMMARY and len(data) >= 6:
+            self.state.cell_low_v = int.from_bytes(data[0:2], 'little') / 1000.0
+            self.state.cell_high_v = int.from_bytes(data[2:4], 'little') / 1000.0
+            self.state.cell_avg_v = int.from_bytes(data[4:6], 'little') / 1000.0
         
-        elif frame_id == self.EVTV_CELLS_1 and len(data) >= 16:
-            for i in range(8):
-                offset = i * 2
-                raw = int.from_bytes(data[offset:offset+2], 'little')
-                self.state.cell_voltages[i] = raw * 0.001
-        
-        elif frame_id == self.EVTV_CELLS_2 and len(data) >= 16:
-            for i in range(8):
-                offset = i * 2
-                raw = int.from_bytes(data[offset:offset+2], 'little')
-                self.state.cell_voltages[8 + i] = raw * 0.001
-        
-        elif frame_id == self.EVTV_TEMPS and len(data) >= 4:
-            for i in range(4):
-                self.state.temps[i] = (data[i] * 0.1) - 40
+        elif frame_id == self.EVTV_CELLS and len(data) >= 8:
+            # Byte 0: sequence number, Byte 1: total 6-cell messages,
+            # Bytes 2-7: six cell voltages encoded as (cellV - 2.00) * 100.
+            seq = data[0]
+            for i in range(6):
+                idx = seq * 6 + i
+                if 0 <= idx < len(self.state.cell_voltages):
+                    self.state.cell_voltages[idx] = (data[2 + i] + 200) / 100.0
 
 
 class SIFrameBuilder:
@@ -136,8 +148,8 @@ class SIFrameBuilder:
     def state_frame(state: EVTVState) -> tuple:
         """0x35F: SOC, SOH"""
         frame = bytearray(8)
-        frame[0] = state.soc_pct & 0xFF
-        frame[1] = state.soh_pct & 0xFF
+        frame[0] = int(state.soc_pct) & 0xFF
+        frame[1] = int(state.soh_pct) & 0xFF
         return (0x35F, bytes(frame))
     
     @staticmethod
@@ -225,9 +237,15 @@ class HABridge:
         """Publish all EVTV state to HA"""
         self.publish_sensor('pack_voltage_v', round(state.voltage_v, 2), 'V')
         self.publish_sensor('pack_current_a', round(state.current_a, 1), 'A')
-        self.publish_sensor('soc_pct', state.soc_pct, '%')
+        self.publish_sensor('pack_ah', round(state.amp_hours, 1), 'Ah')
+        self.publish_sensor('soc_pct', round(state.soc_pct, 1), '%')
         self.publish_sensor('soh_pct', state.soh_pct, '%')
         self.publish_sensor('temperature_c', round(state.temp_c, 1), '°C')
+        self.publish_sensor('temp_max_c', round(state.temp_c, 1), '°C')
+        self.publish_sensor('temp_min_c', round(state.temp_min_c, 1), '°C')
+        self.publish_sensor('cell_high_v', round(state.cell_high_v, 3), 'V')
+        self.publish_sensor('cell_low_v', round(state.cell_low_v, 3), 'V')
+        self.publish_sensor('cell_avg_v', round(state.cell_avg_v, 3), 'V')
         
         for i, cell_v in enumerate(state.cell_voltages[:4], 1):
             self.publish_sensor(f'cell_{i}_v', round(cell_v, 3), 'V')
