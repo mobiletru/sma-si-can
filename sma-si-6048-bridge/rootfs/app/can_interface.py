@@ -62,6 +62,7 @@ class CANBusInterface:
         self.bitrate = bitrate
         self.bus: Optional[can.BusABC] = None
         self.reader: Optional[can.BufferedReader] = None
+        self.notifier: Optional[can.Notifier] = None
         self.writer: Optional[can.CyclicSendTaskABC] = None
         self.rx_callback: Optional[Callable] = None
     
@@ -69,7 +70,7 @@ class CANBusInterface:
         """Connect to CAN bus"""
         try:
             if self.interface == 'pcan':
-                # PCAN-USB adapter via PyPCAN
+                # PCAN-USB adapter via PCAN-Basic chardev driver
                 self.bus = can.interface.Bus(
                     interface='pcan',
                     channel=self.channel,
@@ -77,20 +78,27 @@ class CANBusInterface:
                     state=can.BusState.ACTIVE
                 )
             elif self.interface == 'socketcan':
-                # Native Linux SocketCAN
+                # Native Linux SocketCAN (how PCAN-USB appears on HAOS, e.g. can0)
                 self.bus = can.interface.Bus(
                     interface='socketcan',
                     channel=self.channel,
                     bitrate=self.bitrate,
                     state=can.BusState.ACTIVE
                 )
+            elif self.interface == 'virtual':
+                # In-process virtual bus for hardware-free development/testing
+                self.bus = can.interface.Bus(
+                    interface='virtual',
+                    channel=self.channel,
+                )
             else:
                 logger.error(f"Unknown interface: {self.interface}")
                 return False
             
-            # Set up reader
+            # Set up reader. can.BusABC has no add_reader(); attach the
+            # BufferedReader through a Notifier instead (python-can 4.x).
             self.reader = can.BufferedReader()
-            self.bus.add_reader(self.reader)
+            self.notifier = can.Notifier(self.bus, [self.reader])
             
             logger.info(f"Connected to CAN bus: {self.interface}:{self.channel} @ {self.bitrate} bps")
             return True
@@ -101,6 +109,12 @@ class CANBusInterface:
     
     def disconnect(self) -> None:
         """Disconnect from CAN bus"""
+        if self.notifier:
+            try:
+                self.notifier.stop()
+            except Exception as e:
+                logger.error(f"Error stopping notifier: {e}")
+            self.notifier = None
         if self.bus:
             try:
                 self.bus.shutdown()
@@ -238,6 +252,15 @@ def create_socketcan_interface(channel: str = 'can0') -> CANBusInterface:
     """Create a SocketCAN interface with standard SMA SI settings"""
     return CANBusInterface(
         interface='socketcan',
+        channel=channel,
+        bitrate=500000  # SMA SI standard
+    )
+
+
+def create_virtual_interface(channel: str = 'sma_si_demo') -> CANBusInterface:
+    """Create an in-process virtual interface for hardware-free dev/testing"""
+    return CANBusInterface(
+        interface='virtual',
         channel=channel,
         bitrate=500000  # SMA SI standard
     )
