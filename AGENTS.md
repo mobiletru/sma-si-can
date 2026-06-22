@@ -14,31 +14,45 @@ back onto the bus. There is no web UI of its own — it is a Python service.
 
 ### Dependencies (installed by the startup update script)
 Only `python-can` and `requests` are needed and are installed into the user
-site. **Do not run `pip install -r sma-si-6048-bridge/requirements.txt`** — it
-lists `python-pcan>=1.3.0`, which is **not a real PyPI package** and will fail.
-PCAN support is built into `python-can` (the `pcan` interface), and no source
-file imports a `python-pcan`/`pcan` module, so it is not required for
-development.
+site. `requirements.txt` is the source of truth and is valid; the previously
+listed `python-pcan>=1.3.0` (not a real PyPI package) has been removed. PCAN
+support is built into `python-can` (the `pcan`/`socketcan` interfaces), so no
+extra package is required. The startup update script installs `python-can` and
+`requests` explicitly (rather than `-r requirements.txt`) so it keeps working
+even on older checkouts that still contain the bad pin.
+
+### CAN backend selection (important for HAOS)
+On Home Assistant OS a PCAN-USB adapter is handled natively by the kernel via
+**SocketCAN** and appears as **`can0`**, not as the PCAN-Basic `PCAN_USBCH1`
+chardev (that proprietary driver cannot be installed on HAOS). The bridge
+therefore supports a selectable backend via `--can-interface` /
+`CAN_INTERFACE` / the `can_interface` add-on option:
+- `socketcan` (default, channel `can0`) — for HAOS / native Linux CAN.
+- `pcan` — only where the PCAN-Basic driver is installed.
+- `virtual` — in-process bus for hardware-free dev/testing.
+`run.sh` best-effort brings the SocketCAN link up (`ip link set <ch> up type
+can bitrate 500000`); this needs `NET_ADMIN` and `iproute2` in the image.
 
 ### Lint / test / run
 - **Lint** (no linter configured in repo): `python3 -m compileall sma-si-6048-bridge/rootfs/app`
 - **Tests**: none exist in the repo.
-- **Run the real service**: `python3 sma-si-6048-bridge/rootfs/app/bridge_direct.py --help`
-  shows the CLI. Normal operation needs a PCAN-USB adapter (or SocketCAN
-  `vcan`) plus a reachable Home Assistant. **Neither real CAN hardware nor a
-  `vcan` kernel module is available in the Cloud VM** (no kernel-module
-  tooling), so the literal hardware path cannot run here.
+- **Run the real service**: `python3 sma-si-6048-bridge/rootfs/app/bridge_direct.py --help`.
+  Real CAN hardware and the `vcan` kernel module are **not available in the
+  Cloud VM** (no kernel-module tooling, no `ip`), so `socketcan`/`pcan` cannot
+  run here — use the `virtual` backend instead.
 
-### Running the pipeline without hardware (non-obvious)
-To exercise the bridge end-to-end in the VM, drive the real classes
-(`EVTVReader`, `SIFrameBuilder`, `HABridge`, `SIController`, `EVTVtoSIBridge`)
-over python-can's **in-process `virtual` interface** and point `HABridge` at a
-small mock HTTP server that answers `GET /api/` with 200 and accepts
-`POST /api/states/...`.
+### Running the pipeline without hardware
+Run the real code over the in-process `virtual` backend, e.g.
+`bridge_direct.py --can-interface virtual --can-channel demo`, with `HABridge`
+pointed at a mock HTTP server that answers `GET /api/` with 200 and accepts
+`POST /api/states/...`. Note the `virtual` bus is in-process only, so the
+frame simulator, the bridge, and any monitor must run in the **same process**
+(threads) on the same channel; cross-process virtual buses do not share
+traffic.
 
-Caveat when wiring the CAN interface directly: `CANBusInterface.connect()`
-calls `self.bus.add_reader(...)`, which **does not exist on `can.BusABC` in
-python-can 4.x** (so `connect()` raises). Bypass `connect()` and attach the
-`BufferedReader` via `can.Notifier(bus, [reader])` instead. Use
-`receive_own_messages=False` and put the simulator, the app, and a monitor on
-the same virtual channel.
+### Known remaining issue (not yet fixed)
+`sma-si-6048-bridge/Dockerfile` is out of sync with the actual files: it
+`COPY`s `converter_addon.py` / `run_converter.sh` (which do not exist; the real
+files are `bridge_direct.py` and `run.sh`) and uses `apt-get` although the HA
+base-python image is Alpine (`apk`). The HAOS add-on image will not build until
+this is corrected (and `iproute2` added for the SocketCAN `ip link` step).
